@@ -17,23 +17,23 @@ A React Native app that listens to your voice and plays it back at a higher pitc
 
 ### 1. Push-based VAD instead of polling
 
-`useVoiceDetector` exposes a `feed(db)` function that `useAudioRecorder` calls from `onRecordingStatusUpdate`. This means the VAD reacts the moment a metering value arrives — no polling interval, no drift between sample rate and detection cadence. A `setInterval` approach would add up to one interval of latency on every voice-start event and requires a separate cleanup path.
+Voice activity detection is driven by audio metering callbacks rather than a polling interval. This eliminates detection latency and keeps the VAD decoupled from any specific timer cadence.
 
 ### 2. Forward refs for circular dependency
 
-`onVoiceEnd` is passed to `useVoiceDetector` before `useAudioRecorder` and `useAudioPlayer` are instantiated — so it cannot close over their return values directly. Instead, `stopRecordingRef`, `playWithPitchRef`, and `startMonitoringRef` are created first with no-op defaults, then overwritten on every render with the real functions. This lets callbacks always call the latest function without re-subscribing to the detector.
+Voice detection callbacks are wired up before the recorder and player exist, so they hold refs that are updated each render instead of closing over the functions directly. This breaks the initialization cycle without restructuring the hook hierarchy.
 
-### 3. `appStateRef` alongside `useState`
+### 3. Ref + state mirroring for async callbacks
 
-`onVoiceEnd` is a long-lived async callback. If it read `appState` from a closure, it would capture a stale value from the render where it was created. `appStateRef` is updated synchronously every time `setAppState` is called, so any in-flight async handler always sees the current state without needing to be recreated.
+App state is stored in both React state (for rendering) and a plain ref (for async callbacks). Async handlers read from the ref to avoid acting on a stale snapshot captured at the time the callback was created.
 
 ### 4. Pitch shift via playback rate
 
-`sound.setRateAsync(1.4, false)` increases playback speed with `shouldCorrectPitch: false`, which raises pitch proportionally — the same trick Talking Tom uses. This requires zero native DSP dependencies and works within expo-av's existing API. A dedicated pitch-shift library would add significant bundle size and native complexity for the same perceptible result.
+Audio is played back faster than recorded, which raises pitch as a side effect — no DSP library needed. This keeps the dependency tree small and produces the same perceptible result for this use case.
 
 ### 5. Microphone off during playback
 
-Before calling `playAsync`, the app calls `recorder.stopRecording()` and sets `allowsRecordingIOS: false`. Without this, the iOS audio session stays in recording mode, the speaker routes through the earpiece at low volume, and the open microphone picks up the playback — polluting the next recording with an echo.
+The microphone is stopped before playback begins. Without this, the device's speaker output bleeds into the open mic and corrupts the next recording session.
 
 ## Known limitations
 
