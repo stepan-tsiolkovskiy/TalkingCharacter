@@ -2,10 +2,6 @@
 
 A React Native app that listens to your voice and plays it back at a higher pitch, animated by a Rive character.
 
-## Demo
-
-<!-- GIF or video placeholder -->
-
 ## Tech stack
 
 - Expo SDK 53 + React Native
